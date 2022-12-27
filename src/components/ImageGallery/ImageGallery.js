@@ -1,90 +1,74 @@
-import PropTypes from "prop-types";
-import React, { Component } from "react";
-import ImageGalleryItem from "./ImageGalleryItem/ImageGalleryItem";
-import ImageApi from "../../service/image-api";
-import ButtonLoadMore from "../ButtonLoadMore/ButtonLoadMore";
-import Loader from "../Loader/Loader";
-import "./ImageGallery.css";
+import PropTypes from 'prop-types';
+import React, { useState, useEffect } from 'react';
+import ImageGalleryItem from './ImageGalleryItem/ImageGalleryItem';
+import ImageApi from '../../service/image-api';
+import ButtonLoadMore from '../ButtonLoadMore/ButtonLoadMore';
+import Loader from '../Loader/Loader';
+import './ImageGallery.css';
 
-export class ImageGallery extends Component {
-	state = {
-		images: [],
-		error: "",
-		page: 1,
-		isLoader: false,
-	};
+export default function ImageGallery({ query }) {
+  const [images, setImages] = useState([]);
+  const [error, setError] = useState('second');
+  const [page, setPage] = useState(1);
+  const [isLoader, setIsLoader] = useState(false);
 
-	static propTypes = {
-		error: PropTypes.string,
-		page: PropTypes.number,
-		isLoader: PropTypes.bool,
-		images: PropTypes.arrayOf(
-			PropTypes.shape({
-				hits: PropTypes.arrayOf(
-					PropTypes.shape({
-						id: PropTypes.string,
-						webformatURL: PropTypes.string,
-						largeImageURL: PropTypes.string,
-						tags: PropTypes.arrayOf(PropTypes.string),
-					})
-				),
-			})
-		),
-	};
+  useEffect(() => {
+    setIsLoader(true);
+    ImageApi(query)
+      .then(images => {
+        setImages(images.hits);
+        setPage(2);
+      })
+      .catch(error => setError(error))
+      .finally(() => setIsLoader(false));
+  }, [query]);
 
-	componentDidUpdate(prevProps, prevState) {
-		const { query } = this.props;
-		if (prevProps.query !== query) {
-			this.setState({ isLoader: true });
-			ImageApi(query)
-				.then((images) => this.setState({ images: images.hits, page: 2 }))
-				.catch((error) => this.setState({ error }))
-				.finally(() => this.setState({ isLoader: false }));
-		}
-	}
+  const handleButtonClick = () => {
+    setPage(page + 1);
+    setIsLoader(true);
 
-	handleButtonClick = () => {
-		const { query } = this.props;
-		const { page } = this.state;
+    ImageApi(query, page)
+      .then(images => setImages(prevState => [...prevState, ...images.hits]))
+      .catch(error => setError(error))
+      .finally(() => setIsLoader(false));
+  };
 
-		this.setState(({ page }) => ({
-			page: page + 1,
-			isLoader: true,
-		}));
-
-		ImageApi(query, page)
-			.then((images) =>
-				this.setState((prevState) => ({
-					images: [...prevState.images, ...images.hits],
-				}))
-			)
-			.catch((error) => this.setState({ error }))
-			.finally(() => this.setState({ isLoader: false }));
-	};
-
-	render() {
-		const { images, isLoader } = this.state;
-		const isImages = Boolean(images.length);
-		return (
-			<>
-				<ul className="image-gallery">
-					{"Nothing" &&
-						images.map(({ id, webformatURL, largeImageURL, tags }) => {
-							return (
-								<ImageGalleryItem
-									key={id}
-									smallImage={webformatURL}
-									largeImage={largeImageURL}
-									tags={tags}
-								/>
-							);
-						})}
-				</ul>
-				{isLoader && <Loader />}
-				{isImages && <ButtonLoadMore onClick={this.handleButtonClick} />}
-			</>
-		);
-	}
+  const isImages = Boolean(images.length);
+  return (
+    <>
+      <ul className="image-gallery">
+        {error &&
+          images.map(({ id, webformatURL, largeImageURL, tags }) => {
+            return (
+              <ImageGalleryItem
+                key={id}
+                smallImage={webformatURL}
+                largeImage={largeImageURL}
+                tags={tags}
+              />
+            );
+          })}
+      </ul>
+      {isLoader && <Loader />}
+      {isImages && <ButtonLoadMore onClick={handleButtonClick} />}
+    </>
+  );
 }
 
-export default ImageGallery;
+ImageGallery.propTypes = {
+  error: PropTypes.string,
+  page: PropTypes.number,
+  isLoader: PropTypes.bool,
+  images: PropTypes.arrayOf(
+    PropTypes.shape({
+      hits: PropTypes.arrayOf(
+        PropTypes.shape({
+          id: PropTypes.string,
+          webformatURL: PropTypes.string,
+          largeImageURL: PropTypes.string,
+          tags: PropTypes.arrayOf(PropTypes.string),
+        })
+      ),
+    })
+  ),
+};
